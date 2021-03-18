@@ -106,7 +106,7 @@ class Event:
 
                     second = self.check_supermajority(node_list, event.op[1])#self
 			
-        return
+        return node_list
 
     def print_event_data(self):
         '''
@@ -149,7 +149,7 @@ class Node:
         	sync_node (object Node): The target Node that is sending the new Hashgraph data.
 
         '''
-
+        #pdb.set_trace()
         if (len(self.hg[self.name]) != 0):
 			# If not the init Event, generate hashes for the self- and other-parent Events
             sp_hash = sign_event(self.hg[self.name][-1])
@@ -345,9 +345,10 @@ class Node:
 				i.hg[j.name] = [] 	# Creates empty list for each node that will contain all events
 			i.create_event()		# Create empty init Event for each Node
 		'''
+        pdb.set_trace()
         for i in self.hg[self.name]:
             try:
-                if ( i.sp_hash is not None):
+                if ( i.sp[1] is not None):
                     i.round = 1
                     i.witness = True
                     print("\nwork")
