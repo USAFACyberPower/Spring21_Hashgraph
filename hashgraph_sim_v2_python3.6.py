@@ -88,25 +88,33 @@ class Event:
         self.sp = (self_parent, self_parent_event_hash)
         self.op = (other_parent, other_parent_event_hash)
         self.round = None
-        self.witness = None
+        self.witness = None #True data is verfied, False data is unverified, None data does not exist
         self.node_name = node
 
-    def check_supermajority(self, node_list, event):
+    def check_supermajority(self, node_list, event, thresh_events):
         ''' 
 		does it return node_list or some measure of supermajority?
 		'''
-        if event.witness:
-            if event.node_name not in node_list:
-                node_list.append(event.node_name)
+        #pdb.set_trace()
+        if event.witness:#event->self
+            #pdb.set_trace()
+            if self.node_name not in node_list:#event->self
+                node_list.append(self.node_name)#event->self
             return node_list
         else:
-            first = self.check_supermajority(node_list, event.sp[1])#added self
+            #pdb.set_trace()
+            event.witness = True
+            first = self.check_supermajority(node_list, event, thresh_events)#added self#event.sp->self
             for i in first:
                 if i not in node_list:
+                    #pdb.set_trace()
+                    second = self.check_supermajority(node_list, event, thresh_events)#self#event.op->self
+                    print("First: {}\nSecond: {}\n".format(first, second))
 
-                    second = self.check_supermajority(node_list, event.op[1])#self
-			
-        return node_list
+        if(len(node_list) >	thresh_events):
+            return True
+        else:
+            return False
 
     def print_event_data(self):
         '''
@@ -132,7 +140,7 @@ class Node:
             self.sync_request = False	# Sync request flag for simulation
             self.sync_active = False
             self.network = None 	# Simulated network
-
+            self.round = 1 #needed for divide_rounds
     def print_hashgraph(self):
 
         for i in self.network.nodes:
@@ -290,7 +298,7 @@ class Node:
                 dol3[i] = list(dict.fromkeys(dol3[i]))
             self.hg = dol3
             self.network.nodes[targ_idx].hg = dol3
-            #pdb.set_trace()
+            pdb.set_trace()
 			# Create new event after comparing graphs to finish sync
             self.network.nodes[targ_idx].hg[targ_node].append(Event(time, data=self.generate_random_data(), self_parent=self.network.nodes[targ_idx].name, other_parent=self.name,self_parent_event_hash=None, other_parent_event_hash=None, node=None))#need to match up all the inputs
 			
@@ -346,23 +354,60 @@ class Node:
 			i.create_event()		# Create empty init Event for each Node
 		'''
         pdb.set_trace()
+        num_of_events = len(self.hg)
+        thresh = num_of_events*2/3
+        round = 0
+        #unable to get rounds to increase and witnesses. i.sp[0].round > round throws an str error 
         for i in self.hg[self.name]:
             try:
-                if ( i.sp[1] is not None):
-                    i.round = 1
-                    i.witness = True
-                    print("\nwork")
-					
+                ###setting round to the highest parent of the event
+                
+                if(i.sp[0] is not None):
+                    if(i.sp[0].round > round):
+                        round = i.sp[0].round
+                    else:
+                        round =round
+                elif(i.sp[0] is None):
+                    round = 1
                 else:
-										
-                    event_supermajority = i.check_supermajority([], i)
-						
+                    round = 1
+                    
+                if(i.op[0] is not None):
+                    if(i.op[0].round > round):
+                        round = i.op[0].round
+                    else:
+                        round =round
+                elif(i.op[0] is None):
+                    round = 1
+                else:
+                    round = 1
+                
+                ###End of setting round to highest parent of the event
+                if (i.check_supermajority([], i,thresh)):
+                    i.round = round+1
+                    print(" moved")
+                else:
+                    i.round = round
+                    print(" stayed")
 					# Check if current event can "strongly see" a supermajority of witness events of the same round
 					#if :
 					#	pass
-            except AttributeError:
+                if ((i.sp[0] is None) ):
+                    i.witness = True
+                elif(i.sp[0] is not None):
+                    if(i.sp[0].round is not None):
+                        if (i.round < i.sp[0].round):
+                            i.witness = False
+                        else:
+                            i.witness = True
+                    else:
+                        i.witness = False
+                else:
+                    i.witness = True
+            except AttributeError:#This should not occur, if it does that means check_supermajority failed
                 print("\ncontinue")
-                event_supermajority = i.check_supermajority([], i)
+                
+                #event_supermajority = i.check_supermajority([], i)
         
         
         return
@@ -396,10 +441,11 @@ class Node:
             if not SIM:
 
 				# IMPORTANT: The following code will only be used in the actual implementation, not the simulation.
-        			#rand_node_idx = random.randrange(N)
+                rand_node_idx = random.randrange(N)
                 
                 while(current_node == rand_node_idx):
-                    pass
+                    rand_node_idx = random.randrange(N)
+                   
 				# Pick random node != current node 
 				#while(current_node == (rand_node_idx := random.randrange(N))):		
 					#rand_node_idx = random.randrange(N)
@@ -438,8 +484,8 @@ def test_nodes(nw):
         	
 
 		while(r_node == (new_node)):#while(r_node == (new_node := random.choice(list(nw.nodes[current_node].hg)))):
-		#	new_node = random.choice(list(nw.nodes[current_node].hg))
-           		pass
+			new_node = random.choice(list(nw.nodes[current_node].hg))
+           		
 
 		print("\nNode initiating sync: {}: Begin sync to node {}\n".format(r_node, new_node))
 
@@ -501,7 +547,6 @@ def main(nodes):
 	network.node_set_network(network)
 	# Display nodes
 	network.print_nodes()
-    
     
 	# TEST: Check each Node
 	for i in network.nodes:
