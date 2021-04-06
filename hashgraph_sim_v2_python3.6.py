@@ -87,7 +87,7 @@ class Event:
         self.data = data
         self.sp = (self_parent, self_parent_event_hash)
         self.op = (other_parent, other_parent_event_hash)
-        self.round = None
+        self.round = 1
         self.witness = None #True data is verfied, False data is unverified, None data does not exist
         self.node_name = node
 
@@ -140,7 +140,7 @@ class Node:
             self.sync_request = False	# Sync request flag for simulation
             self.sync_active = False
             self.network = None 	# Simulated network
-            self.round = 1 #needed for divide_rounds
+            self.round = 0 #needed for divide_rounds
     def print_hashgraph(self):
 
         for i in self.network.nodes:
@@ -300,7 +300,7 @@ class Node:
             self.network.nodes[targ_idx].hg = dol3
             pdb.set_trace()
 			# Create new event after comparing graphs to finish sync
-            self.network.nodes[targ_idx].hg[targ_node].append(Event(time, data=self.generate_random_data(), self_parent=self.network.nodes[targ_idx].name, other_parent=self.name,self_parent_event_hash=None, other_parent_event_hash=None, node=None))#need to match up all the inputs
+            self.network.nodes[targ_idx].hg[targ_node].append(Event(time, data=self.generate_random_data(), self_parent=self.network.nodes[targ_idx], other_parent=self,self_parent_event_hash=None, other_parent_event_hash=None, node=None))#need to match up all the inputs
 			
 			# Wait for the receiving node to finish syncing on their end
             while self.network.nodes[targ_idx].sync_active:
@@ -358,52 +358,102 @@ class Node:
         thresh = num_of_events*2/3
         round = 0
         #unable to get rounds to increase and witnesses. i.sp[0].round > round throws an str error 
+        #found error in wait_sync or begin_sync where it does not initialize the nodes correctly causing errors here.
+        referencesize = 32
         for i in self.hg[self.name]:
             try:
                 ###setting round to the highest parent of the event
-                
-                if(i.sp[0] is not None):
-                    if(i.sp[0].round > round):
-                        round = i.sp[0].round
-                    else:
-                        round =round
-                elif(i.sp[0] is None):
-                    round = 1
-                else:
-                    round = 1
-                    
-                if(i.op[0] is not None):
-                    if(i.op[0].round > round):
-                        round = i.op[0].round
-                    else:
-                        round =round
-                elif(i.op[0] is None):
-                    round = 1
-                else:
-                    round = 1
-                
-                ###End of setting round to highest parent of the event
-                if (i.check_supermajority([], i,thresh)):
-                    i.round = round+1
-                    print(" moved")
-                else:
-                    i.round = round
-                    print(" stayed")
-					# Check if current event can "strongly see" a supermajority of witness events of the same round
-					#if :
-					#	pass
-                if ((i.sp[0] is None) ):
-                    i.witness = True
-                elif(i.sp[0] is not None):
-                    if(i.sp[0].round is not None):
-                        if (i.round < i.sp[0].round):
-                            i.witness = False
+                num_of_elements = int(i.__sizeof__()/referencesize)
+                if(num_of_elements > 1):
+                    for j in range(num_of_elements):
+                        if(i[j].sp[0] is not None):
+                            if(i[j].sp[0].round > round):
+                                round = i.sp[0].round
+                            else:
+                                round =round
+                        elif(i[j].sp[0] is None):
+                            round = 1
                         else:
-                            i.witness = True
-                    else:
-                        i.witness = False
+                            round = 1
+                            
+                        if(i[j].op[0] is not None):
+                            if(i[j].op[0].round > round):
+                                round = i[j].op[0].round
+                            else:
+                                round =round
+                        elif(i[j].op[0] is None):
+                            round = 1
+                        else:
+                            round = 1
+                        
+                        ###End of setting round to highest parent of the event
+                        if (i[j].check_supermajority([], i[j],thresh)):
+                            i[j].round = round+1
+                            print(" moved")
+                        else:
+                            i[j].round = round
+                            print(" stayed")
+                            # Check if current event can "strongly see" a supermajority of witness events of the same round
+                            #if :
+                            #	pass
+                        if ((i[j].sp[0] is None) ):
+                            i[j].witness = True
+                        elif(i[j].sp[0] is not None):
+                            if(i[j].sp[0].round is not None):
+                                if (i[j].round < i[j].sp[0].round):
+                                    i[j].witness = False
+                                else:
+                                    i[j].witness = True
+                            else:
+                                i[j].witness = False
+                        else:
+                            i[j].witness = True
+                            
+                            
                 else:
-                    i.witness = True
+                    
+                    if(i.sp[0] is not None):
+                        if(i.sp[0].round > round):
+                            round = i.sp[0].round
+                        else:
+                            round =round
+                    elif(i.sp[0] is None):
+                        round = 1
+                    else:
+                        round = 1
+                        
+                    if(i.op[0] is not None):
+                        if(i.op[0].round > round):
+                            round = i.op[0].round
+                        else:
+                            round =round
+                    elif(i.op[0] is None):
+                        round = 1
+                    else:
+                        round = 1
+                    
+                    ###End of setting round to highest parent of the event
+                    if (i.check_supermajority([], i,thresh)):
+                        i.round = round+1
+                        print(" moved")
+                    else:
+                        i.round = round
+                        print(" stayed")
+                        # Check if current event can "strongly see" a supermajority of witness events of the same round
+                        #if :
+                        #	pass
+                    if ((i.sp[0] is None) ):
+                        i.witness = True
+                    elif(i.sp[0] is not None):
+                        if(i.sp[0].round is not None):
+                            if (i.round <= i.sp[0].round):
+                                i.witness = False
+                            else:
+                                i.witness = True
+                        else:
+                            i.witness = False
+                    else:
+                        i.witness = True            
             except AttributeError:#This should not occur, if it does that means check_supermajority failed
                 print("\ncontinue")
                 
@@ -480,7 +530,7 @@ def test_nodes(nw):
 		r_node = random.choice(list(nw.nodes[current_node].hg))
 		new_node = random.choice(list(nw.nodes[current_node].hg))
 		# Pick random node != current node. Only works with most current version of Python 3.
-
+        
         	
 
 		while(r_node == (new_node)):#while(r_node == (new_node := random.choice(list(nw.nodes[current_node].hg)))):
@@ -502,10 +552,10 @@ def test_nodes(nw):
 				break
 			n_idx += 1
             
-
+		#pdb.set_trace()
 		# Simulation threading
-		t1 = threading.Thread(target=nw.nodes[r_idx].begin_sync, args=(new_node,))
-		t2 = threading.Thread(target=nw.nodes[n_idx].wait_sync, args=())
+		t1 = threading.Thread(target=nw.nodes[r_idx].begin_sync, args=(new_node,))#adding new_node to r_node list
+		t2 = threading.Thread(target=nw.nodes[n_idx].wait_sync, args=())#stops sending information
 		
 		t1.start()
 		t2.start()
