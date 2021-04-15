@@ -38,7 +38,7 @@ class Network:
 	def __init__(self):
 		self.nodes = []
 		self.active = True
-
+        
 	def init_nodes(self, new_nodes):
 		'''
 		SIM: Adds all of the nodes in hg_nodes to the simulated Network.
@@ -88,30 +88,40 @@ class Event:
         self.sp = (self_parent, self_parent_event_hash)
         self.op = (other_parent, other_parent_event_hash)
         self.round = 1
-        self.witness = None #True data is verfied, False data is unverified, None data does not exist
+        self.witness = False #True data is verfied, False data is unverified, None data does not exist
         self.node_name = node
+        self.new = True
 
     def check_supermajority(self, node_list, event, thresh_events):
         ''' 
 		does it return node_list or some measure of supermajority?
 		'''
         #pdb.set_trace()
+        if( event.witness is None):
+            return
         if event.witness:#event->self
             #pdb.set_trace()
-            if self.node_name not in node_list:#event->self
-                node_list.append(self.node_name)#event->self
+            if event.node_name not in node_list:#event->self->event
+                node_list.append(event.node_name)#event->self->event
             return node_list
-        else:
+        elif(event.sp[0] is not None):
             #pdb.set_trace()
-            event.witness = True
-            first = self.check_supermajority(node_list, event, thresh_events)#added self#event.sp->self
+            #event.witness = True
+            first = self.check_supermajority(node_list, event.sp[0], thresh_events)#added self#event.sp->self->event
+            if(first is None):
+                return False
+            elif(first is True):
+                return True
+            elif(first is False):
+                return False
             for i in first:
                 if i not in node_list:
                     #pdb.set_trace()
-                    second = self.check_supermajority(node_list, event, thresh_events)#self#event.op->self
+                    second = self.check_supermajority(node_list, event.op[0], thresh_events)#self#event.op->self
                     print("First: {}\nSecond: {}\n".format(first, second))
-
-        if(len(node_list) >	thresh_events):
+        else:
+            return
+        if(len(node_list) >=	thresh_events):
             return True
         else:
             return False
@@ -141,6 +151,7 @@ class Node:
             self.sync_active = False
             self.network = None 	# Simulated network
             self.round = 0 #needed for divide_rounds
+            self.witness = None
     def print_hashgraph(self):
 
         for i in self.network.nodes:
@@ -278,6 +289,7 @@ class Node:
 
 			#searches through nodes to find one with matching name
             targ_idx = 0
+            #pdb.set_trace()
             for i in self.network.nodes:
                 if i.name == targ_node:
                     break
@@ -298,10 +310,13 @@ class Node:
                 dol3[i] = list(dict.fromkeys(dol3[i]))
             self.hg = dol3
             self.network.nodes[targ_idx].hg = dol3
-            pdb.set_trace()
+            #pdb.set_trace()
+            latest_self_node = len(self.hg[self.name])-1
+            latest_other_node= len(self.network.nodes[targ_idx].hg[targ_node])-1
 			# Create new event after comparing graphs to finish sync
-            self.network.nodes[targ_idx].hg[targ_node].append(Event(time, data=self.generate_random_data(), self_parent=self.network.nodes[targ_idx], other_parent=self,self_parent_event_hash=None, other_parent_event_hash=None, node=None))#need to match up all the inputs
-			
+            self.network.nodes[targ_idx].hg[targ_node].append(Event(time, data=self.generate_random_data(), self_parent=self.hg[targ_node][latest_other_node], other_parent=self.hg[self.name][latest_self_node],self_parent_event_hash=None, other_parent_event_hash=None, node=targ_node))#need to match up all the inputs
+            #self.network.nodes[targ_idx].hg[targ_node].append(Event(time, data=self.generate_random_data(), self_parent=self.hg[targ_node][latest_other_node], other_parent=self.hg[self.name][latest_self_node],self_parent_event_hash=None, other_parent_event_hash=None, node=targ_node))#need to match up all the inputs
+
 			# Wait for the receiving node to finish syncing on their end
             while self.network.nodes[targ_idx].sync_active:
                 pass
@@ -353,72 +368,23 @@ class Node:
 				i.hg[j.name] = [] 	# Creates empty list for each node that will contain all events
 			i.create_event()		# Create empty init Event for each Node
 		'''
-        pdb.set_trace()
+        #pdb.set_trace()
         num_of_events = len(self.hg)
         thresh = num_of_events*2/3
-        round = 0
-        #unable to get rounds to increase and witnesses. i.sp[0].round > round throws an str error 
-        #found error in wait_sync or begin_sync where it does not initialize the nodes correctly causing errors here.
+        round = 1
+        #rounds are not increasing properly for new nodes
         referencesize = 32
         for i in self.hg[self.name]:
             try:
-                ###setting round to the highest parent of the event
-                num_of_elements = int(i.__sizeof__()/referencesize)
-                if(num_of_elements > 1):
-                    for j in range(num_of_elements):
-                        if(i[j].sp[0] is not None):
-                            if(i[j].sp[0].round > round):
-                                round = i.sp[0].round
-                            else:
-                                round =round
-                        elif(i[j].sp[0] is None):
-                            round = 1
-                        else:
-                            round = 1
-                            
-                        if(i[j].op[0] is not None):
-                            if(i[j].op[0].round > round):
-                                round = i[j].op[0].round
-                            else:
-                                round =round
-                        elif(i[j].op[0] is None):
-                            round = 1
-                        else:
-                            round = 1
-                        
-                        ###End of setting round to highest parent of the event
-                        if (i[j].check_supermajority([], i[j],thresh)):
-                            i[j].round = round+1
-                            print(" moved")
-                        else:
-                            i[j].round = round
-                            print(" stayed")
-                            # Check if current event can "strongly see" a supermajority of witness events of the same round
-                            #if :
-                            #	pass
-                        if ((i[j].sp[0] is None) ):
-                            i[j].witness = True
-                        elif(i[j].sp[0] is not None):
-                            if(i[j].sp[0].round is not None):
-                                if (i[j].round < i[j].sp[0].round):
-                                    i[j].witness = False
-                                else:
-                                    i[j].witness = True
-                            else:
-                                i[j].witness = False
-                        else:
-                            i[j].witness = True
-                            
-                            
-                else:
-                    
+                if(i.new):
+                    print("\nnew")
                     if(i.sp[0] is not None):
                         if(i.sp[0].round > round):
                             round = i.sp[0].round
                         else:
                             round =round
-                    elif(i.sp[0] is None):
-                        round = 1
+                    #elif(i.sp[0] is None):
+                    #    round = 1
                     else:
                         round = 1
                         
@@ -427,12 +393,13 @@ class Node:
                             round = i.op[0].round
                         else:
                             round =round
-                    elif(i.op[0] is None):
-                        round = 1
+                    #elif(i.op[0] is None):
+                    #    round = 1
                     else:
-                        round = 1
+                        round = round #will reset to 1 if not careful
                     
                     ###End of setting round to highest parent of the event
+                    #pdb.set_trace()
                     if (i.check_supermajority([], i,thresh)):
                         i.round = round+1
                         print(" moved")
@@ -453,13 +420,16 @@ class Node:
                         else:
                             i.witness = False
                     else:
-                        i.witness = True            
+                        i.witness = True         
+                    i.new = False
+                else:
+                    print("\nold")
             except AttributeError:#This should not occur, if it does that means check_supermajority failed
                 print("\ncontinue")
                 
                 #event_supermajority = i.check_supermajority([], i)
-        
-        
+            print("\n\nround= {}\nnumber= {}\nwitness= {}\n\n".format(i.round,i, i.witness))
+        print("\n\nthresh ={}".format(thresh))
         return
 
     def decide_fame(self):
@@ -579,13 +549,13 @@ def test_nodes(nw):
 		for i in nw.nodes:
 			i.divide_rounds()
 		# DECIDE FAME - This will run individually on each node
-		for i in nw.nodes:
-			i.decide_fame()
+		#for i in nw.nodes:
+		#	i.decide_fame()
 		
 
 		# FIND ORDER - This will run individually on each node
-		for i in nw.nodes:
-			i.find_order()
+		#for i in nw.nodes:
+		#	i.find_order()
 	return
 
 #pdb.set_trace()
