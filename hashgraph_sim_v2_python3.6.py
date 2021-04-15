@@ -91,41 +91,44 @@ class Event:
         self.witness = False #True data is verfied, False data is unverified, None data does not exist
         self.node_name = node
         self.new = True
-
-    def check_supermajority(self, node_list, event, thresh_events):
-        ''' 
-		does it return node_list or some measure of supermajority?
-		'''
-        #pdb.set_trace()
+    def node_trace(self, node_list, event, within_round):
+        '''
+        Finds all witness nodes connected in a round
+        '''
+        pdb.set_trace()
+        
+        if (event is None):
+            return node_list
+        if(event.round != within_round):
+            return node_list
         if( event.witness is None):
-            return
-        if event.witness:#event->self
-            #pdb.set_trace()
-            if event.node_name not in node_list:#event->self->event
+            return node_list
+        if (event.witness):#event->self
+            
+            
+            if (event.node_name not in node_list):#event->self->event
                 node_list.append(event.node_name)#event->self->event
             return node_list
         elif(event.sp[0] is not None):
-            #pdb.set_trace()
-            #event.witness = True
-            first = self.check_supermajority(node_list, event.sp[0], thresh_events)#added self#event.sp->self->event
-            if(first is None):
-                return False
-            elif(first is True):
-                return True
-            elif(first is False):
-                return False
-            for i in first:
-                if i not in node_list:
-                    #pdb.set_trace()
-                    second = self.check_supermajority(node_list, event.op[0], thresh_events)#self#event.op->self
-                    print("First: {}\nSecond: {}\n".format(first, second))
-        else:
-            return
+            
+            first = self.node_trace(node_list, event.sp[0], within_round)#added self#event.sp->self->event
+            second = self.node_trace(node_list, event.op[0], within_round)
+            
+            print("First: {}\nSecond: {}\n".format(first, second))
+            #time.sleep(5)
+
+    def check_supermajority(self, node_list, event, thresh_events, within_round):
+        ''' 
+		does it return node_list or some measure of supermajority?
+		'''
+               
+        event.node_trace(node_list,event, within_round)
+        #pdb.set_trace()
         if(len(node_list) >=	thresh_events):
             return True
         else:
             return False
-
+    
     def print_event_data(self):
         '''
 		Prints the data contained in the current Event.
@@ -400,7 +403,8 @@ class Node:
                     
                     ###End of setting round to highest parent of the event
                     #pdb.set_trace()
-                    if (i.check_supermajority([], i,thresh)):
+                    i.round =  round
+                    if (i.check_supermajority([], i, thresh, round)):
                         i.round = round+1
                         print(" moved")
                     else:
@@ -430,6 +434,7 @@ class Node:
                 #event_supermajority = i.check_supermajority([], i)
             print("\n\nround= {}\nnumber= {}\nwitness= {}\n\n".format(i.round,i, i.witness))
         print("\n\nthresh ={}".format(thresh))
+        time.sleep(2)
         return
 
     def decide_fame(self):
